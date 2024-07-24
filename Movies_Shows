@@ -1,0 +1,54 @@
+-- Load the data from HDFS
+data = LOAD '/user/maria_dev/pig/Netflix_Shows1' 
+    USING PigStorage(',') 
+    AS (show_id:chararray, type:chararray, title:chararray, director:chararray, 
+        cast:chararray, country:chararray, date_added:chararray, release_year:int, 
+        rating:chararray, duration:chararray, listed_in:chararray, description:chararray);
+
+-- Example 1: Filter shows from specific countries (e.g., 'United States' and 'Canada')
+filtered_data = FILTER data BY (country == 'United States' OR country == 'Canada');
+
+-- Example 2: Order the data by release_year in descending order
+ordered_data = ORDER filtered_data BY release_year DESC;
+
+-- Example 3: Store the ordered data into HDFS
+STORE ordered_data INTO '/user/maria_dev/pig/ordered_data';
+
+-- Example 4: Calculate the average duration of shows by type
+-- First, convert duration to int (assuming it's in minutes and as a string)
+data_with_duration = FOREACH data GENERATE show_id, type, title, 
+    (CASE WHEN duration IS NOT NULL THEN CAST(duration AS int) ELSE 0 END) AS duration;
+
+-- Group by type
+grouped_by_type = GROUP data_with_duration BY type;
+
+-- Calculate average duration
+average_duration = FOREACH grouped_by_type GENERATE group AS type, AVG(duration) AS avg_duration;
+
+-- Store the result into HDFS
+STORE average_duration INTO '/user/maria_dev/pig/average_duration';
+
+-- Example 5: Join data for two specific countries (e.g., 'United States' and 'Canada')
+-- Filter data for each country
+data_us = FILTER data BY country == 'United States';
+data_canada = FILTER data BY country == 'Canada';
+
+-- Join data from both countries on a common attribute, e.g., type
+-- You may need to adjust the join key based on your actual data structure
+joined_data = JOIN data_us BY type, data_canada BY type;
+
+-- Store the joined data into HDFS
+STORE joined_data INTO '/user/maria_dev/pig/joined_data';
+
+-- Example 6: Calculate variance and covariance of release_years and durations
+-- Group data by country
+grouped_by_country = GROUP data BY country;
+
+-- Calculate variance and covariance
+variance_covariance = FOREACH grouped_by_country GENERATE 
+    group AS country, 
+    VARIANCE(release_year) AS variance_release_year,
+    COVAR_SAMP(release_year, duration) AS covar_release_year_duration;
+
+-- Store the variance and covariance results into HDFS
+STORE variance_covariance INTO '/user/maria_dev/pig/variance_covariance';
